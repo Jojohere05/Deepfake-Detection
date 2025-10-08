@@ -309,35 +309,40 @@ st.markdown("""
 # -------------------------------
 @st.cache_resource
 def load_model_by_name(model_name):
-  
+    s3_bucket = "dfd-models"  # Your bucket name
 
-    s3_bucket = "dfd-models"
-
-    # Map model names to S3 keys and local filenames
+    # Map model names to exact S3 keys
     model_map = {
-        "SE+CNN": "deepfake_cnn+se_model.h5",
-        "CNN": "deepfake_cnn_model .h5",  # keep S3 trailing space if object has it
+        "SE+CNN": "deepfake_cnn+se_model.h5",  # removed trailing space
+        "CNN": "deepfake_cnn_model.h5"
     }
 
     if model_name not in model_map:
-        raise ValueError("Model not recognized")
+        raise ValueError(f"Model '{model_name}' not recognized.")
 
     s3_key = model_map[model_name]
-    local_path = s3_key.strip()  # remove any trailing spaces for local file
+    local_path = s3_key  # Save locally with same name
 
-    # Create S3 client with credentials from Streamlit secrets
+    # Setup S3 client
     s3 = boto3.client(
         "s3",
         aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
         aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"],
-        region_name=st.secrets["AWS_DEFAULT_REGION"],
+        region_name=st.secrets["AWS_DEFAULT_REGION"]
     )
 
-    # Download if not already present locally
+    # Check if file exists locally
     if not os.path.exists(local_path):
-        s3.download_file(s3_bucket, s3_key, local_path)
+        try:
+            # Confirm object exists in S3 first
+            s3.head_object(Bucket=s3_bucket, Key=s3_key)
+            # Download file
+            s3.download_file(s3_bucket, s3_key, local_path)
+            print(f"✅ Downloaded '{s3_key}' from S3.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to download '{s3_key}' from S3: {e}")
 
-    # Load and return the model
+    # Load and return Keras model
     return load_model(local_path)
 
 
@@ -922,3 +927,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
