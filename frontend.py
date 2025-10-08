@@ -309,23 +309,35 @@ st.markdown("""
 # -------------------------------
 @st.cache_resource
 def load_model_by_name(model_name):
-    import boto3
+  
 
     s3_bucket = "dfd-models"
-    if model_name == "SE+CNN":
-        s3_key = "deepfake_cnn+se_model.h5"
-        local_path = "deepfake_cnn+se_model.h5"
-    elif model_name == "CNN":
-        s3_key = "deepfake_cnn_model.h5"
-        local_path = "deepfake_cnn_model .h5"
-    else:
+
+    # Map model names to S3 keys and local filenames
+    model_map = {
+        "SE+CNN": "deepfake_cnn+se_model.h5",
+        "CNN": "deepfake_cnn_model .h5",  # keep S3 trailing space if object has it
+    }
+
+    if model_name not in model_map:
         raise ValueError("Model not recognized")
 
-    # Download from S3 if not present locally
-    if not os.path.exists(local_path):
-        s3 = boto3.client("s3")
-        s3.download_file(s3_bucket, s3_key, local_path)  # BUCKET_NAME, OBJECT_KEY, LOCAL_PATH
+    s3_key = model_map[model_name]
+    local_path = s3_key.strip()  # remove any trailing spaces for local file
 
+    # Create S3 client with credentials from Streamlit secrets
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=st.secrets["AWS_SECRET_ACCESS_KEY"],
+        region_name=st.secrets["AWS_DEFAULT_REGION"],
+    )
+
+    # Download if not already present locally
+    if not os.path.exists(local_path):
+        s3.download_file(s3_bucket, s3_key, local_path)
+
+    # Load and return the model
     return load_model(local_path)
 
 
