@@ -8,9 +8,17 @@ import warnings
 import time
 from datetime import datetime
 import gdown
-import os
-import boto3
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+import boto3   # Only import needed libraries here
+
+aws_access_key_id = st.secrets["AWS_ACCESS_KEY_ID"]
+aws_secret_access_key = st.secrets["AWS_SECRET_ACCESS_KEY"]
+region_name = st.secrets["AWS_DEFAULT_REGION"]
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=aws_access_key_id,
+    aws_secret_access_key=aws_secret_access_key,
+    region_name=region_name,
+)
 
 # -------------------------------
 # 🔹 Page Navigation Function
@@ -309,7 +317,7 @@ def load_model_by_name(model_name):
         local_path = "deepfake_cnn+se_model.h5"
     elif model_name == "CNN":
         s3_key = "deepfake_cnn_model.h5"
-        local_path = "deepfake_cnn_model.h5"
+        local_path = "deepfake_cnn_model .h5"
     else:
         raise ValueError("Model not recognized")
 
