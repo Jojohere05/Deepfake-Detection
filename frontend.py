@@ -355,22 +355,74 @@ def preprocess_frame(frame):
     return np.expand_dims(frame, axis=0)
 
 def extract_frames(video_path, max_frames=20):
-    cap = cv2.VideoCapture(video_path)
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    interval = max(1, total_frames // max_frames)
-
+    """Extract frames from video with robust error handling"""
     frames = []
-    count = 0
-    while count < max_frames:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-        if pos % interval == 0:
-            frames.append(frame)
-            count += 1
-    cap.release()
-    return frames
+    
+    try:
+        cap = cv2.VideoCapture(video_path)
+        
+        # Check if video opened successfully
+        if not cap.isOpened():
+            st.error(f"❌ Error: Could not open video file")
+            return []
+        
+        # Get video properties
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        
+        st.info(f"📹 Video Info: {total_frames} frames, {fps:.2f} FPS, {width}x{height}")
+        
+        # Handle edge cases
+        if total_frames <= 0:
+            st.warning("⚠️ Could not determine frame count, reading sequentially...")
+            # Fallback: read frames sequentially
+            count = 0
+            while count < max_frames:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frames.append(frame)
+                count += 1
+        else:
+            # Calculate which frames to extract
+            if total_frames <= max_frames:
+                # Extract all frames if video is short
+                frame_indices = list(range(total_frames))
+            else:
+                # Extract evenly spaced frames
+                interval = total_frames / max_frames
+                frame_indices = [int(i * interval) for i in range(max_frames)]
+            
+            st.info(f"🎯 Extracting frames at indices: {frame_indices[:5]}... (showing first 5)")
+            
+            # Extract frames
+            for idx in frame_indices:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, frame = cap.read()
+                
+                if ret and frame is not None:
+                    frames.append(frame)
+                else:
+                    # If seeking fails, try sequential read
+                    st.warning(f"⚠️ Could not seek to frame {idx}, trying sequential read...")
+        
+        cap.release()
+        
+        # Final status
+        if len(frames) == 0:
+            st.error("❌ Error: No frames were extracted from the video")
+        else:
+            st.success(f"✅ Successfully extracted {len(frames)} frames")
+        
+        return frames
+        
+    except Exception as e:
+        st.error(f"❌ Exception during frame extraction: {str(e)}")
+        if 'cap' in locals():
+            cap.release()
+        return []
 
 def predict_video(video_path, model):
     frames = extract_frames(video_path)
@@ -391,7 +443,6 @@ def predict_video(video_path, model):
     verdict = "✅ REAL" if real_pct > fake_pct else "❌ FAKE"
 
     return verdict, real_pct, fake_pct, frames, predictions
-
 # -------------------------------
 # 🔹 Page Content Functions
 # -------------------------------
@@ -927,4 +978,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
